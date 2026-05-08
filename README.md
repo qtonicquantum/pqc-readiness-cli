@@ -152,6 +152,40 @@ The strength analysis labels each finding using NIST SP 800-57 Rev 5 thresholds:
 
 Output is a single JSON document with `bomFormat: "CycloneDX"`, `specVersion: "1.7"`, fresh `serialNumber` URN UUID, and one `cryptographic-asset` component per detected primitive. Reference examples for nginx, openssl, OpenJDK, python-venv, go-binary, and node-app live in https://github.com/qtonicquantum/cbom-cyclonedx-examples.
 
+
+## Test coverage
+
+The CLI ships with **60 tests** (unit, integration, regression, and Hypothesis property tests) at **90.91% line coverage**, with a 90% floor enforced in CI.
+
+Reproduce locally:
+
+```bash
+git clone https://github.com/qtonicquantum/pqc-readiness-cli.git
+cd pqc-readiness-cli
+pip install -e ".[dev]"
+python -m pytest -q
+```
+
+The matrix in `.github/workflows/ci.yml` runs the same test suite across Python 3.10/3.11/3.12/3.13 and Ubuntu/macOS/Windows on every push.
+
+## Verify the release
+
+Every release on this repository is signed with [Sigstore](https://www.sigstore.dev/) using GitHub OIDC. The release-time identity binds the artifact to this repository's release workflow at the tagged commit, so a verifier can confirm the wheel and tarball were built from this exact source tree.
+
+Verify `v0.1.0` end-to-end:
+
+```bash
+pip install sigstore
+gh release download v0.1.0 --repo qtonicquantum/pqc-readiness-cli --dir release-v0.1.0
+cd release-v0.1.0
+python -m sigstore verify github \
+  --bundle pqc_readiness_cli-0.1.0-py3-none-any.whl.sigstore.json \
+  --cert-identity 'https://github.com/qtonicquantum/pqc-readiness-cli/.github/workflows/release.yml@refs/tags/v0.1.0' \
+  pqc_readiness_cli-0.1.0-py3-none-any.whl
+```
+
+The same identity is bound to the source tarball and to a build-provenance attestation queryable via `gh api repos/qtonicquantum/pqc-readiness-cli/attestations/sha256:<digest>`.
+
 ## Documentation
 
 - [Methodology](docs/METHODOLOGY.md) — what gets detected and how
