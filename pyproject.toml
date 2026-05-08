@@ -73,7 +73,3 @@ disallow_untyped_defs = false
 addopts = "--cov=pqc_readiness --cov-report=term-missing --cov-fail-under=90"
 testpaths = ["tests"]
 
-[tool.mutmut]
-paths_to_mutate = "src/pqc_readiness/"
-tests_dir = "tests/"
-runner = "python -m pytest -x -q"

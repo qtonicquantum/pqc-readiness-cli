@@ -1,7 +1,10 @@
-name: mutmut-cron
+# Manual-dispatch only. mutmut 3.x has stability issues in hosted-runner
+# environments (filesystem-walking edge cases); avoid pretending we have
+# automated weekly mutation testing until that is reliable.
+#
+# To run: gh workflow run mutmut-cron.yml --repo qtonicquantum/pqc-readiness-cli
+name: mutmut-manual
 on:
-  schedule:
-    - cron: "0 6 * * 1"
   workflow_dispatch: {}
 
 permissions:
@@ -10,7 +13,7 @@ permissions:
 jobs:
   mutate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,19 +23,14 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e ".[dev]" "mutmut>=3.0,<4.0"
-      - name: Run mutation testing
-        run: mutmut run
-      - name: Show results
-        if: always()
+      - name: Run mutation testing on src/pqc_readiness/analysis
+        working-directory: src/pqc_readiness/analysis
         run: |
+          mutmut run --max-children 4 || true
           mutmut results | tee mutmut-results.log
-          mutmut stats >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-      - name: Upload mutmut DB + results
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mutmut-results
-          path: |
-            mutmut-results.log
-            .mutmut-cache
-            mutants/
+          path: src/pqc_readiness/analysis/mutmut-results.log
