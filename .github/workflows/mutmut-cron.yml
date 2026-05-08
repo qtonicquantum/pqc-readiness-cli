@@ -1,7 +1,7 @@
 name: mutmut-cron
 on:
   schedule:
-    - cron: "0 6 * * 1"   # weekly Monday 06:00 UTC
+    - cron: "0 6 * * 1"
   workflow_dispatch: {}
 
 permissions:
@@ -10,26 +10,29 @@ permissions:
 jobs:
   mutate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]" mutmut
+      - name: Install
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]" "mutmut>=3.0,<4.0"
       - name: Run mutation testing
-        run: |
-          mutmut run --paths-to-mutate src/pqc_readiness --runner "python -m pytest -q -x" --simple-output 2>&1 | tee mutmut.log || true
-          mutmut results 2>&1 | tee mutmut-results.log
-        continue-on-error: true
-      - name: Summary
-        run: |
-          echo "## Mutation testing results" >> $GITHUB_STEP_SUMMARY
-          tail -n 50 mutmut-results.log >> $GITHUB_STEP_SUMMARY
+        run: mutmut run
+      - name: Show results
         if: always()
-      - uses: actions/upload-artifact@v4
+        run: |
+          mutmut results | tee mutmut-results.log
+          mutmut stats >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+      - name: Upload mutmut DB + results
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: mutmut-results
           path: |
-            mutmut.log
             mutmut-results.log
+            .mutmut-cache
+            mutants/

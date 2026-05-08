@@ -3,6 +3,10 @@
 Components include cryptoProperties.assetType=ALGORITHM and algorithmProperties so
 the emitted CBOM matches the structure of the reference examples in
 qtonicquantum/cbom-cyclonedx-examples.
+
+Each component also carries `properties` with the Qtonic Quantum strength
+classification ("qtonicquantum:strength") so downstream consumers can triage
+without re-running the analysis.
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ from __future__ import annotations
 import datetime as _dt
 from importlib.metadata import PackageNotFoundError, version
 
+from cyclonedx.model import Property
 from cyclonedx.model.bom import Bom
 from cyclonedx.model.component import Component, ComponentType
 from cyclonedx.model.crypto import (
@@ -58,10 +63,12 @@ def _functions_for(algorithm: str) -> set[CryptoFunction]:
 def build_bom(findings: list[Finding], subject: str = "pqc-readiness-cli inventory") -> Bom:
     """Construct a CycloneDX 1.7 Bom with cryptographic-asset components.
 
-    Each Finding becomes a Component(type=CRYPTOGRAPHIC_ASSET) with
-    cryptoProperties.assetType=ALGORITHM and a populated algorithmProperties block.
-    Metadata.timestamp, metadata.tools, and metadata.component are populated so
-    the emitted CBOM is complete per CycloneDX 1.7 best practice.
+    Each Finding becomes a Component(type=CRYPTOGRAPHIC_ASSET) with:
+      - cryptoProperties.assetType=ALGORITHM
+      - populated algorithmProperties (primitive, parameter set, crypto functions)
+      - properties: qtonicquantum:strength = the Finding's assessment label
+      - properties: qtonicquantum:source = the source path
+    Metadata.timestamp, metadata.tools, and metadata.component are populated.
     """
     bom = Bom()
     bom.metadata.timestamp = _dt.datetime.now(_dt.timezone.utc)
@@ -73,8 +80,9 @@ def build_bom(findings: list[Finding], subject: str = "pqc-readiness-cli invento
     )
     bom.metadata.tools.components.add(tool_component)
 
+    # NAMED root component (silences cyclonedx-python-lib UserWarning about None)
     subject_component = Component(
-        name=subject,
+        name=subject if subject else "pqc-readiness-cli inventory",
         type=ComponentType.APPLICATION,
         version=_CLI_VERSION,
     )
@@ -101,12 +109,21 @@ def build_bom(findings: list[Finding], subject: str = "pqc-readiness-cli invento
             algorithm_properties=algo_props,
             oid=f.oid,
         )
+        # Strength + source as queryable properties (downstream triage)
+        props = [
+            Property(name="qtonicquantum:strength", value=f.assessment),
+            Property(name="qtonicquantum:source", value=f.source_path),
+        ]
+        if f.recommendation:
+            props.append(Property(name="qtonicquantum:recommendation", value=f.recommendation))
+
         component = Component(
             name=f.asset_id,
             type=ComponentType.CRYPTOGRAPHIC_ASSET,
             version=f.algorithm,
             description=" | ".join(description_parts),
             crypto_properties=crypto_props,
+            properties=props,
         )
         bom.components.add(component)
     return bom

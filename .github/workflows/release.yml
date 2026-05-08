@@ -21,21 +21,30 @@ jobs:
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
-          pip install build sigstore
+          pip install build sigstore cyclonedx-bom
       - name: Build sdist + wheel
         run: python -m build
+      - name: List dist contents
+        run: ls -la dist/
       - name: Sign artifacts with Sigstore
         run: |
           for f in dist/*.whl dist/*.tar.gz; do
             python -m sigstore sign "$f"
           done
-      - name: Generate self-CBOM (CycloneDX 1.7)
+      - name: Generate self-CBOM (CycloneDX 1.7) — best effort
         run: |
-          pip install cyclonedx-bom jsonschema
-          python -m cyclonedx_py environment --output-format JSON --outfile dist/pqc-readiness-cli.cbom.json
+          cyclonedx-py environment --output-format JSON --outfile dist/pqc-readiness-cli.cbom.json || \
+          cyclonedx-py requirements -o dist/pqc-readiness-cli.cbom.json --output-format JSON || \
+          echo "self-CBOM step failed (non-fatal); release continues"
         continue-on-error: true
-      - name: List dist contents
-        run: ls -la dist/
+      - name: Determine prerelease flag from tag
+        id: prerelease
+        run: |
+          if [[ "${GITHUB_REF}" == *-* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -47,10 +56,10 @@ jobs:
             dist/pqc-readiness-cli.cbom.json
           generate_release_notes: true
           fail_on_unmatched_files: false
-      - name: Generate attestation
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+      - name: Generate build-provenance attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
             dist/*.whl
             dist/*.tar.gz
-        continue-on-error: true
