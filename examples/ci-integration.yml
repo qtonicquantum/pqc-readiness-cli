@@ -1,0 +1,23 @@
+# Sample GitHub Actions snippet to run pqc-readiness-cli in CI.
+name: pqc-readiness
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  cbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pqc-readiness-cli
+      - name: Generate CBOM
+        run: pqc-readiness inventory --directory ./certs --output cbom.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cbom
+          path: cbom.json
