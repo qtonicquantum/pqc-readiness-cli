@@ -1,0 +1,56 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build sigstore
+      - name: Build sdist + wheel
+        run: python -m build
+      - name: Sign artifacts with Sigstore
+        run: |
+          for f in dist/*.whl dist/*.tar.gz; do
+            python -m sigstore sign "$f"
+          done
+      - name: Generate self-CBOM (CycloneDX 1.7)
+        run: |
+          pip install cyclonedx-bom jsonschema
+          python -m cyclonedx_py environment --output-format JSON --outfile dist/pqc-readiness-cli.cbom.json
+        continue-on-error: true
+      - name: List dist contents
+        run: ls -la dist/
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.whl
+            dist/*.whl.sigstore.json
+            dist/*.tar.gz
+            dist/*.tar.gz.sigstore.json
+            dist/pqc-readiness-cli.cbom.json
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+      - name: Generate attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+        continue-on-error: true
