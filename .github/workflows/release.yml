@@ -26,6 +26,13 @@ jobs:
         run: python -m build
       - name: List dist contents
         run: ls -la dist/
+      - name: Publish to PyPI (Trusted Publisher)
+        # Requires Trusted Publisher configured at https://pypi.org/manage/account/publishing/
+        # for repository qtonicquantum/pqc-readiness-cli, workflow release.yml.
+        # OIDC token from id-token: write (already granted at workflow level).
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true
       - name: Sign artifacts with Sigstore
         run: |
           for f in dist/*.whl dist/*.tar.gz; do
