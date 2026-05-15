@@ -58,7 +58,7 @@ jobs:
           fail_on_unmatched_files: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
       - name: Generate build-provenance attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/*.whl
